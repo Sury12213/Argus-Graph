@@ -1,0 +1,122 @@
+// ============================================
+// Argus-Graph — Prisma Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── User & Auth ──────────────────────────────
+
+model User {
+  id              String   @id @default(uuid())
+  walletAddress   String   @unique
+  displayName     String?
+  maxRiskScore    Int      @default(50)       // Risk tolerance (0-100). Block if score > this.
+  autoExitEnabled Boolean  @default(false)    // Guardian Auto-Exit feature
+  slippageBps     Int      @default(100)      // Default slippage in basis points (1%)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  scans     Scan[]
+  watchlist Watchlist[]
+  nonces    AuthNonce[]
+
+  @@index([walletAddress])
+}
+
+// Nonce for wallet signature verification (anti-replay)
+model AuthNonce {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  wallet    String
+  nonce     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([wallet, nonce])
+}
+
+// ── Scan Results ─────────────────────────────
+
+model Scan {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  tokenAddress   String
+  tokenSymbol    String?
+  tokenName      String?
+
+  // Engine scores (0-100)
+  clusterRisk    Float
+  velocityScore  Float
+  smartMoney     Float
+  basicOnchain   Float
+  finalScore     Float
+
+  // Decision
+  decision       String   // APPROVED | BLOCKED | WARNING
+  aiExplanation  String?  @db.Text
+
+  // Raw engine output for debugging / detail view
+  rawData        Json
+
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([tokenAddress])
+}
+
+// ── Wallet Cluster Detection ─────────────────
+
+model WalletCluster {
+  id            String   @id @default(uuid())
+  clusterId     String   @unique
+  memberCount   Int
+  riskLevel     String   // LOW | MEDIUM | HIGH | CRITICAL
+  fundingSource String?  // Common funding wallet
+  wallets       Json     // string[] of wallet addresses
+  metadata      Json?    // Extra context (circular trading, etc.)
+  tokenAddress  String?  // Associated token
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([riskLevel])
+  @@index([tokenAddress])
+}
+
+// ── Smart Money Tracking ─────────────────────
+
+model SmartWallet {
+  id        String   @id @default(uuid())
+  address   String   @unique
+  winRate   Float    // 0.0 - 1.0
+  label     String?  // "Early Bird", "Whale", "Sniper"
+  totalPnl  Float?   // Lifetime PnL in SOL
+  tradeCount Int     @default(0)
+  metadata  Json?    // Extra data
+  updatedAt DateTime @updatedAt
+
+  @@index([winRate(sort: Desc)])
+}
+
+// ── User Watchlist ───────────────────────────
+
+model Watchlist {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  tokenAddress String
+  tokenSymbol  String?
+  alertEnabled Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, tokenAddress])
+}
