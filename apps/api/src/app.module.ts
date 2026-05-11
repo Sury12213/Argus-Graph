@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { join } from 'node:path';
 import { PrismaModule } from './providers/prisma/prisma.module';
 import { RedisModule } from './providers/redis/redis.module';
 import { HeliusModule } from './providers/helius/helius.module';
-import { GeminiModule } from './providers/gemini/gemini.module';
+import { LlmModule } from './providers/ai/llm.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { ScanModule } from './modules/scan/scan.module';
@@ -15,6 +16,8 @@ import { DecisionModule } from './modules/decision/decision.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SmartMoneyModule } from './modules/smart-money/smart-money.module';
 import { SocialModule } from './modules/social/social.module';
+import { WatchlistModule } from './modules/watchlist/watchlist.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -22,14 +25,14 @@ import { HealthController } from './health.controller';
     // Config
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../../.env'],
+      envFilePath: [join(__dirname, '..', '..', '..', '.env')],
     }),
 
     // Infrastructure Providers
     PrismaModule,
     RedisModule,
     HeliusModule,
-    GeminiModule,
+    LlmModule,
 
     // Feature Modules
     AuthModule,
@@ -43,6 +46,8 @@ import { HealthController } from './health.controller';
     AiModule,
     SmartMoneyModule,
     SocialModule,
+    WatchlistModule,
+    TelegramModule,
   ],
   controllers: [HealthController],
 })

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings as SettingsIcon, Shield, Sliders, Save } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Sliders, Save, Send } from 'lucide-react';
 import { userApi } from '../services/api';
 
 const Settings = () => {
@@ -11,12 +11,13 @@ const Settings = () => {
     displayName: '',
   });
   const [saved, setSaved] = useState(false);
+  const [telegramLinkedAt, setTelegramLinkedAt] = useState<string | null>(null);
+  const [telegramCode, setTelegramCode] = useState('');
+  const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null);
+  const [telegramStatus, setTelegramStatus] = useState('');
+  const [telegramDeepLink, setTelegramDeepLink] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const { data } = await userApi.getProfile();
       const profile = data.data;
@@ -26,10 +27,15 @@ const Settings = () => {
         slippageBps: profile.slippageBps ?? 100,
         displayName: profile.displayName ?? '',
       });
+      setTelegramLinkedAt(profile.telegramLinkedAt ?? null);
     } catch {
-      // Use defaults
+      setTelegramStatus('Using default settings because profile could not be loaded.');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(loadSettings);
+  }, [loadSettings]);
 
   const handleSave = async () => {
     try {
@@ -37,7 +43,27 @@ const Settings = () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      // Handle error
+      setTelegramStatus('Failed to save settings.');
+    }
+  };
+
+  const handleCreateTelegramCode = async () => {
+    try {
+      const { data } = await userApi.createTelegramLinkCode();
+      const deepLink = data.data.deepLink;
+      setTelegramCode(data.data.code);
+      setTelegramBotUsername(data.data.botUsername);
+      setTelegramDeepLink(deepLink);
+
+      if (deepLink) {
+        window.open(deepLink, '_blank', 'noopener,noreferrer');
+        setTelegramStatus('Telegram chat opened in a new tab. Press Start in the bot to finish connecting.');
+        return;
+      }
+
+      setTelegramStatus('Telegram link code is ready.');
+    } catch {
+      setTelegramStatus('Failed to create Telegram link code.');
     }
   };
 
@@ -45,7 +71,7 @@ const Settings = () => {
     if (score >= 75) return { label: 'Very Aggressive', color: 'var(--color-danger)' };
     if (score >= 50) return { label: 'Moderate', color: 'var(--color-warning)' };
     if (score >= 30) return { label: 'Conservative', color: 'var(--color-safe)' };
-    return { label: 'Ultra Safe', color: 'var(--color-info)' };
+    return { label: 'Max Protection', color: 'var(--color-info)' };
   };
 
   const riskProfile = getRiskLabel(settings.maxRiskScore);
@@ -122,7 +148,7 @@ const Settings = () => {
               color: 'var(--color-text-muted)',
               marginTop: 'var(--space-1)',
             }}>
-              <span>Ultra Safe (10)</span>
+              <span>Max Protection (10)</span>
               <span>Aggressive (90)</span>
             </div>
           </div>
@@ -147,7 +173,7 @@ const Settings = () => {
             </h3>
           </div>
 
-          {/* Auto Exit */}
+          {/* Guardian One-Click Exit */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -158,9 +184,9 @@ const Settings = () => {
             marginBottom: 'var(--space-4)',
           }}>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>🛡️ Guardian Auto-Exit</div>
+              <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>Guardian One-Click Exit</div>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
-                Auto-sell if dev rugs or cluster dumps
+                Prepare emergency Jupiter exits from high-risk scans. Every sell still requires wallet approval.
               </div>
             </div>
             <button
@@ -235,6 +261,56 @@ const Settings = () => {
             />
           </div>
         </motion.div>
+
+        <motion.div
+          className="card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          style={{ marginTop: 'var(--space-6)' }}
+        >
+          <div className="card-header">
+            <h3 className="card-title">
+              <Send size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
+              Telegram Alerts
+            </h3>
+            <span style={{ color: telegramLinkedAt ? 'var(--color-safe)' : 'var(--color-warning)', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+              {telegramLinkedAt ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.6, marginBottom: 'var(--space-4)' }}>
+            Telegram is used only for proactive Watchlist surveillance alerts, such as rug-pull risk,
+            dev dumps, bot pumps, or a token becoming blocked. Manual scans stay on the web UI.
+          </p>
+          <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+            <button type="button" className="btn btn-primary btn-lg" onClick={handleCreateTelegramCode}>
+              <Send size={16} />
+              {telegramLinkedAt ? 'Reconnect Telegram' : 'Connect Telegram'}
+            </button>
+            {telegramCode && !telegramDeepLink && (
+              <div style={{ padding: 'var(--space-4)', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 6 }}>Fallback link code</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xl)', fontWeight: 900, letterSpacing: 2 }}>
+                  {telegramCode}
+                </div>
+                {telegramBotUsername ? (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 6 }}>
+                    Open @{telegramBotUsername} and send /start {telegramCode}.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginTop: 6 }}>
+                    Set TELEGRAM_BOT_USERNAME to enable one-click linking.
+                  </div>
+                )}
+              </div>
+            )}
+            {telegramStatus && (
+              <div style={{ fontSize: 'var(--text-sm)', color: telegramLinkedAt ? 'var(--color-safe)' : 'var(--color-text-secondary)' }}>
+                {telegramStatus}
+              </div>
+            )}
+          </div>
+        </motion.div>
       </div>
 
       {/* Save Button */}
@@ -254,7 +330,7 @@ const Settings = () => {
             animate={{ opacity: 1, x: 0 }}
             style={{ color: 'var(--color-safe)', fontWeight: 600 }}
           >
-            ✓ Settings saved!
+            Saved: Settings saved!
           </motion.span>
         )}
       </motion.div>
@@ -263,3 +339,4 @@ const Settings = () => {
 };
 
 export default Settings;
+

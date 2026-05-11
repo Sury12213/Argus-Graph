@@ -1,4 +1,5 @@
-import { FC, useMemo } from 'react';
+import { useMemo } from 'react';
+import type { FC, ReactNode } from 'react';
 import {
   ConnectionProvider,
   WalletProvider,
@@ -11,7 +12,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export const WalletContextProvider: FC<Props> = ({ children }) => {
@@ -35,3 +36,4 @@ export const WalletContextProvider: FC<Props> = ({ children }) => {
     </ConnectionProvider>
   );
 };
+

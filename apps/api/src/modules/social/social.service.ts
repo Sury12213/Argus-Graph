@@ -1,79 +1,70 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { SocialScraperService } from '../velocity/social-scraper.service';
 
 /**
- * 📡 Social Intelligence Engine
+ * 📡 Social Intelligence Engine v2
  *
- * Analyzes social media signals from X (Twitter) and Telegram.
- * Currently uses mock data. Phase 4 will integrate real APIs.
+ * Now powered by real data from SocialScraperService (RapidAPI twitter-api45).
+ * Falls back to DexScreener-derived estimates if Twitter unavailable.
  *
- * Metrics: bot_ratio, sentiment, activity velocity
- * Used as input to Velocity Engine and overall scoring.
+ * Used as a display-only panel (not directly in scoring formula —
+ * VelocityService handles scoring using the same data source).
  */
 @Injectable()
 export class SocialService {
   private readonly logger = new Logger(SocialService.name);
 
-  async analyze(tokenAddress: string): Promise<SocialAnalysisResult> {
+  constructor(private social: SocialScraperService) {}
+
+  async analyze(tokenAddress: string, tokenSymbol?: string): Promise<SocialAnalysisResult> {
     this.logger.debug(`Analyzing social signals for ${tokenAddress}`);
 
-    // Mock social analysis — will integrate X/Telegram APIs in Phase 4
-    return this.getMockSocialData(tokenAddress);
-  }
+    // Try to get real Twitter data via SocialScraperService
+    const symbol = tokenSymbol ?? tokenAddress.slice(0, 6).toUpperCase();
+    const tweetData = await this.social.getTweetVelocity(symbol, tokenAddress).catch(() => null);
 
-  private getMockSocialData(tokenAddress: string): SocialAnalysisResult {
-    // Scam token patterns
-    if (tokenAddress.includes('Scam')) {
+    if (tweetData) {
+      // Real data from RapidAPI
+      const botRatioNormalized = Math.min(1, (tweetData.bot_ratio - 1) / 10); // ratio 1→0%, 10→90%
       return {
-        social_score: 75, // High risk
-        tweet_count: 350,
-        unique_authors: 15,
-        bot_ratio: 0.85,
-        sentiment: -0.3,
-        sentiment_label: 'SUSPICIOUS',
-        telegram_members: 120,
-        telegram_active: 8,
-        mentions_growth_rate: 300,
+        social_score: tweetData.is_bot_pump ? 70 : botRatioNormalized > 0.4 ? 50 : 20,
+        tweet_count: tweetData.current_count,
+        unique_authors: tweetData.current_unique,
+        bot_ratio: Math.min(1, Math.max(0, botRatioNormalized)),
+        sentiment: tweetData.is_organic ? 0.4 : tweetData.is_bot_pump ? -0.3 : 0.1,
+        sentiment_label: tweetData.is_bot_pump ? 'SUSPICIOUS' : tweetData.is_organic ? 'POSITIVE' : 'NEUTRAL',
+        telegram_members: null,
+        telegram_active: null,
+        mentions_growth_rate: tweetData.growth_rate,
+        data_source: 'twitter_live',
       };
     }
 
-    // Safe token patterns
-    if (tokenAddress.includes('Safe')) {
-      return {
-        social_score: 15, // Low risk
-        tweet_count: 2300,
-        unique_authors: 2100,
-        bot_ratio: 0.08,
-        sentiment: 0.7,
-        sentiment_label: 'POSITIVE',
-        telegram_members: 15000,
-        telegram_active: 3200,
-        mentions_growth_rate: 12,
-      };
-    }
-
-    // Default / unknown
+    // Fallback: return neutral placeholder (no mock numbers)
     return {
-      social_score: 45,
-      tweet_count: 50,
-      unique_authors: 40,
-      bot_ratio: 0.2,
-      sentiment: 0.1,
-      sentiment_label: 'NEUTRAL',
-      telegram_members: 500,
-      telegram_active: 80,
-      mentions_growth_rate: 25,
+      social_score: 0,
+      tweet_count: null,
+      unique_authors: null,
+      bot_ratio: 0,
+      sentiment: 0,
+      sentiment_label: 'UNKNOWN',
+      telegram_members: null,
+      telegram_active: null,
+      mentions_growth_rate: 0,
+      data_source: 'unavailable',
     };
   }
 }
 
 export interface SocialAnalysisResult {
   social_score: number;
-  tweet_count: number;
-  unique_authors: number;
+  tweet_count: number | null;
+  unique_authors: number | null;
   bot_ratio: number;
-  sentiment: number;            // -1.0 to 1.0
+  sentiment: number;
   sentiment_label: string;
-  telegram_members: number;
-  telegram_active: number;
-  mentions_growth_rate: number;  // % growth in last interval
+  telegram_members: number | null;
+  telegram_active: number | null;
+  mentions_growth_rate: number;
+  data_source?: string;
 }

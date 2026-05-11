@@ -21,11 +21,11 @@ export class ScanController {
   /**
    * Execute a new token scan.
    * POST /api/v1/scans
-   * Body: { input: "scan $RUGME" | "mua 1 SOL $MEME" | "<token_address>" }
+   * Body: { input: "scan <token_address>" }
    */
   @Post()
   async createScan(@Request() req: any, @Body() dto: CreateScanDto) {
-    const result = await this.scanService.executeScan(req.user.id, dto.input);
+    const result = await this.scanService.executeScan(req.user.id, dto.input, dto.requestId);
     return new ApiResponse(result, 'Scan completed');
   }
 

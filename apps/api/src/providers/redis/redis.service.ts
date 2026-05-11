@@ -2,11 +2,11 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 
 /**
- * Redis Service with in-memory fallback.
+ * Redis Service.
  *
- * When Redis is not available (Docker not running),
- * falls back to a simple Map-based in-memory cache.
- * This allows the backend to run without Docker during development.
+ * Production requires Redis for consistent velocity time-series and shared cache
+ * behavior across instances. Development may fall back to an in-memory cache
+ * when Docker is not running.
  */
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -20,6 +20,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {}
 
+  private get isProduction(): boolean {
+    return this.configService.get<string>('NODE_ENV') === 'production';
+  }
+
   async onModuleInit() {
     try {
       const Redis = (await import('ioredis')).default;
@@ -29,7 +33,11 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         maxRetriesPerRequest: 1,
         retryStrategy: (times) => {
           if (times > 2) {
-            this.logger.warn('⚡ Redis not available — switching to in-memory fallback');
+            if (this.isProduction) {
+              this.logger.error('Redis is required in production. Startup aborted.');
+              return null;
+            }
+            this.logger.warn('Redis not available — switching to development in-memory fallback');
             this.useMemoryFallback = true;
             this.client?.disconnect();
             this.client = null;
@@ -42,9 +50,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.client.connect();
-      this.logger.log('⚡ Redis connected');
-    } catch {
-      this.logger.warn('⚡ Redis not available — using in-memory fallback (data is not persisted)');
+      this.logger.log('Redis connected');
+    } catch (error: any) {
+      if (this.isProduction) {
+        this.logger.error(`Redis connection failed in production: ${error.message}`);
+        throw error;
+      }
+      this.logger.warn('Redis not available — using development in-memory fallback (data is not persisted)');
       this.useMemoryFallback = true;
       this.client = null;
     }
@@ -53,7 +65,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     if (this.client) {
       await this.client.quit();
-      this.logger.log('⚡ Redis disconnected');
+      this.logger.log('Redis disconnected');
     }
   }
 
@@ -138,5 +150,39 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const data = await this.client.get(key);
     if (!data) return null;
     return JSON.parse(data) as T;
+  }
+
+  async acquireLock(key: string, ttlSeconds: number): Promise<string | null> {
+    const token = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+
+    if (this.useMemoryFallback) {
+      const existing = this.memoryCache.get(key);
+      if (existing && Date.now() <= existing.expiresAt) return null;
+      this.memoryCache.set(key, {
+        value: JSON.stringify({ token }),
+        expiresAt: Date.now() + ttlSeconds * 1000,
+      });
+      return token;
+    }
+
+    const result = await this.client.set(key, token, 'EX', ttlSeconds, 'NX');
+    return result === 'OK' ? token : null;
+  }
+
+  async releaseLock(key: string, token: string): Promise<void> {
+    if (this.useMemoryFallback) {
+      const existing = this.memoryCache.get(key);
+      if (!existing || Date.now() > existing.expiresAt) return;
+      const data = JSON.parse(existing.value) as { token?: string };
+      if (data.token === token) this.memoryCache.delete(key);
+      return;
+    }
+
+    await this.client.eval(
+      "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+      1,
+      key,
+      token,
+    );
   }
 }

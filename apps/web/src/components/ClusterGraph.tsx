@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 
+type SimulationNode = GraphNode & d3.SimulationNodeDatum;
+type SimulationLink = Omit<GraphLink, 'source' | 'target'> & d3.SimulationLinkDatum<SimulationNode>;
+const simulationNode = (node: SimulationLink['source'] | SimulationLink['target']) => node as SimulationNode;
+
 interface GraphNode {
   id: string;
   label: string;
@@ -43,6 +47,9 @@ const RISK_GLOW: Record<string, string> = {
   low: 'none',
 };
 
+/** Apply glow filter string for a given risk level */
+const getRiskGlow = (risk: string) => RISK_GLOW[risk] ?? 'none';
+
 const ClusterGraph = ({ data }: ClusterGraphProps) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -50,10 +57,13 @@ const ClusterGraph = ({ data }: ClusterGraphProps) => {
 
   useEffect(() => {
     const container = svgRef.current?.parentElement;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      setDimensions({ width: Math.max(500, rect.width - 32), height: 450 });
-    }
+    if (!container) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      setDimensions({ width: Math.max(500, entry.contentRect.width - 32), height: 450 });
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -66,8 +76,8 @@ const ClusterGraph = ({ data }: ClusterGraphProps) => {
     svg.selectAll('*').remove();
 
     // Deep clone data for D3 mutation
-    const nodes: GraphNode[] = data.nodes.map(n => ({ ...n }));
-    const links: GraphLink[] = data.links.map(l => ({ ...l }));
+    const nodes: SimulationNode[] = data.nodes.map(n => ({ ...n }));
+    const links: SimulationLink[] = data.links.map(l => ({ ...l }));
 
     // Defs: arrow markers + glow filter
     const defs = svg.append('defs');
@@ -116,96 +126,112 @@ const ClusterGraph = ({ data }: ClusterGraphProps) => {
       });
     svg.call(zoom);
 
-    // Force simulation
-    const simulation = d3.forceSimulation(nodes as any)
-      .force('link', d3.forceLink(links as any).id((d: any) => d.id).distance(80).strength(0.5))
-      .force('charge', d3.forceManyBody().strength(-200))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius((d: any) => d.size + 5));
+    // Force simulation - tuned for readable, spread-out layout
+    const simulation = d3.forceSimulation<SimulationNode>(nodes)
+      .force('link', d3.forceLink<SimulationNode, SimulationLink>(links).id((d) => d.id).distance(120).strength(0.2))
+      .force('charge', d3.forceManyBody<SimulationNode>().strength(-400).distanceMax(400))
+      .force('center', d3.forceCenter(width / 2, height / 2).strength(0.05))
+      .force('collision', d3.forceCollide<SimulationNode>().radius((d) => d.size + 20).strength(0.9))
+      .alphaDecay(0.02);
 
     // Draw links
     const link = g.append('g')
-      .selectAll('line')
+      .selectAll<SVGLineElement, SimulationLink>('line')
       .data(links)
       .join('line')
-      .attr('stroke', (d: any) => d.is_circular ? '#ff4757' : 'rgba(255,255,255,0.12)')
-      .attr('stroke-width', (d: any) => d.is_circular ? 2.5 : Math.max(0.5, d.strength * 3))
-      .attr('stroke-dasharray', (d: any) => d.is_circular ? '6,3' : 'none')
-      .attr('marker-end', (d: any) => d.is_circular ? 'url(#arrowhead-circular)' : 'url(#arrowhead)');
+      .attr('stroke', (d) => d.is_circular ? '#ff4757' : 'rgba(255,255,255,0.12)')
+      .attr('stroke-width', (d) => d.is_circular ? 2.5 : Math.max(0.5, d.strength * 3))
+      .attr('stroke-dasharray', (d) => d.is_circular ? '6,3' : 'none')
+      .attr('marker-end', (d) => d.is_circular ? 'url(#arrowhead-circular)' : 'url(#arrowhead)');
 
     // Draw nodes
     const node = g.append('g')
-      .selectAll('circle')
+      .selectAll<SVGCircleElement, SimulationNode>('circle')
       .data(nodes)
       .join('circle')
-      .attr('r', (d: any) => d.size)
-      .attr('fill', (d: any) => NODE_COLORS[d.type] || '#70a1ff')
-      .attr('stroke', (d: any) => d.type === 'deployer' ? '#ff6b81' : 'rgba(255,255,255,0.15)')
-      .attr('stroke-width', (d: any) => d.type === 'deployer' ? 3 : 1)
-      .attr('filter', (d: any) => d.risk === 'critical' || d.type === 'deployer' ? 'url(#glow)' : '')
-      .style('cursor', 'pointer')
-      .on('mouseover', (event: any, d: any) => {
+      .attr('r', (d) => d.size)
+      .attr('fill', (d) => NODE_COLORS[d.type] || '#70a1ff')
+      .attr('stroke', (d) => d.type === 'deployer' ? '#ff6b81' : 'rgba(255,255,255,0.15)')
+      .attr('stroke-width', (d) => d.type === 'deployer' ? 3 : 1)
+      .attr('filter', (d) => d.risk === 'critical' || d.type === 'deployer' ? 'url(#glow)' : '')
+      .style('filter', (d) => getRiskGlow(d.risk) !== 'none' ? `drop-shadow(${getRiskGlow(d.risk)})` : '')
+      .style('cursor', 'grab')
+      .on('mouseover', (event: MouseEvent, d: SimulationNode) => {
         const tooltip = tooltipRef.current;
         if (tooltip) {
           tooltip.style.display = 'block';
           tooltip.style.left = `${event.offsetX + 12}px`;
           tooltip.style.top = `${event.offsetY - 10}px`;
-          tooltip.innerHTML = `
-            <strong>${d.label}</strong><br/>
-            Type: <span style="color:${NODE_COLORS[d.type]}">${d.type}</span><br/>
-            Risk: ${d.risk}<br/>
-            ${d.holding_pct > 0 ? `Holding: ${d.holding_pct.toFixed(1)}%` : ''}
-            ${d.cluster_id ? `<br/>Cluster: ${d.cluster_id}` : ''}
-          `;
+          tooltip.replaceChildren();
+
+          const title = document.createElement('strong');
+          title.textContent = d.label ?? 'Unknown';
+          tooltip.appendChild(title);
+
+          const rows = [
+            `Type: ${d.type ?? 'unknown'}`,
+            `Risk: ${d.risk ?? 'unknown'}`,
+            d.holding_pct > 0 ? `Holding: ${d.holding_pct.toFixed(1)}%` : null,
+            d.cluster_id ? `Cluster: ${d.cluster_id}` : null,
+          ].filter(Boolean) as string[];
+
+          rows.forEach((row) => {
+            tooltip.appendChild(document.createElement('br'));
+            const line = document.createElement('span');
+            line.textContent = row;
+            tooltip.appendChild(line);
+          });
         }
       })
       .on('mouseout', () => {
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
       })
-      .call(d3.drag<any, any>()
+      .call(d3.drag<SVGCircleElement, SimulationNode>()
         .on('start', (event, d) => {
           if (!event.active) simulation.alphaTarget(0.3).restart();
           d.fx = d.x;
           d.fy = d.y;
+          d3.select(event.sourceEvent.target).style('cursor', 'grabbing');
         })
         .on('drag', (event, d) => {
           d.fx = event.x;
           d.fy = event.y;
         })
-        .on('end', (event, d) => {
+        .on('end', (event) => {
           if (!event.active) simulation.alphaTarget(0);
-          d.fx = null;
-          d.fy = null;
+          // Keep node pinned where user dropped it
+          // d.fx = null; d.fy = null;  removed so dragged nodes stay put
+          d3.select(event.sourceEvent.target).style('cursor', 'grab');
         }));
 
     // Node labels
     const label = g.append('g')
-      .selectAll('text')
+      .selectAll<SVGTextElement, SimulationNode>('text')
       .data(nodes)
       .join('text')
-      .text((d: any) => d.type === 'deployer' ? '🔴 DEPLOYER' : d.label)
-      .attr('font-size', (d: any) => d.type === 'deployer' ? 11 : 9)
+      .text((d) => d.type === 'deployer' ? ' DEPLOYER' : d.label)
+      .attr('font-size', (d) => d.type === 'deployer' ? 11 : 9)
       .attr('fill', 'rgba(255,255,255,0.7)')
       .attr('text-anchor', 'middle')
-      .attr('dy', (d: any) => d.size + 14)
+      .attr('dy', (d) => d.size + 14)
       .style('pointer-events', 'none')
       .style('font-family', 'var(--font-mono)');
 
     // Update positions on tick
     simulation.on('tick', () => {
       link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
+        .attr('x1', (d) => simulationNode(d.source).x ?? 0)
+        .attr('y1', (d) => simulationNode(d.source).y ?? 0)
+        .attr('x2', (d) => simulationNode(d.target).x ?? 0)
+        .attr('y2', (d) => simulationNode(d.target).y ?? 0);
 
       node
-        .attr('cx', (d: any) => d.x)
-        .attr('cy', (d: any) => d.y);
+        .attr('cx', (d) => d.x ?? 0)
+        .attr('cy', (d) => d.y ?? 0);
 
       label
-        .attr('x', (d: any) => d.x)
-        .attr('y', (d: any) => d.y);
+        .attr('x', (d) => d.x ?? 0)
+        .attr('y', (d) => d.y ?? 0);
     });
 
     return () => { simulation.stop(); };
@@ -274,3 +300,4 @@ const ClusterGraph = ({ data }: ClusterGraphProps) => {
 };
 
 export default ClusterGraph;
+

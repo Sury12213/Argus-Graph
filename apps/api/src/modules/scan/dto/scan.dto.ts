@@ -1,13 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class CreateScanDto {
   @IsString()
-  @IsNotEmpty()
-  input: string; // Natural language or token address
-}
+  input: string;
 
-export class ScanByAddressDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  tokenAddress: string;
+  requestId?: string;
 }

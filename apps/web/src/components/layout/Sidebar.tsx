@@ -1,109 +1,72 @@
-import { NavLink } from 'react-router-dom';
+﻿import { NavLink } from 'react-router-dom';
 import {
+  Clock3,
   LayoutDashboard,
-  Search,
+  Radar,
+  ScanSearch,
   Settings,
-  Shield,
-  Activity,
-  Wallet,
+  WalletCards,
 } from 'lucide-react';
+import argusLogo from '../../assets/argus-logo.svg';
 
-const Sidebar = () => {
+type SidebarProps = {
+  isOpen?: boolean;
+  onNavigate?: () => void;
+};
+
+const navItems = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/scan', label: 'Scan Wallet', icon: ScanSearch },
+  { to: '/watchlist', label: 'Watchlist', icon: Radar },
+  { to: '/history', label: 'Scan History', icon: Clock3 },
+];
+
+const Sidebar = ({ isOpen = false, onNavigate }: SidebarProps) => {
   return (
-    <aside className="sidebar">
-      {/* Logo */}
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`} aria-label="Primary navigation">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">🛡️</div>
+        <div className="sidebar-logo-icon" aria-hidden="true">
+          <img src={argusLogo} alt="" />
+        </div>
         <div>
           <div className="sidebar-logo-text">Argus-Graph</div>
-          <div className="sidebar-logo-version">v3.0 — Risk Engine</div>
+          <div className="sidebar-logo-version">Wallet intelligence</div>
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="sidebar-nav">
-        <div className="sidebar-section-title">Main</div>
-
-        <NavLink
-          to="/"
-          end
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
-        >
-          <LayoutDashboard className="nav-link-icon" />
-          Dashboard
-        </NavLink>
-
-        <NavLink
-          to="/scan"
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
-        >
-          <Search className="nav-link-icon" />
-          Scan Token
-        </NavLink>
-
-        <div className="sidebar-section-title">Analytics</div>
-
-        <NavLink
-          to="/clusters"
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
-        >
-          <Shield className="nav-link-icon" />
-          Cluster Map
-        </NavLink>
-
-        <NavLink
-          to="/velocity"
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
-        >
-          <Activity className="nav-link-icon" />
-          Velocity
-        </NavLink>
-
-        <NavLink
-          to="/smart-money"
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
-        >
-          <Wallet className="nav-link-icon" />
-          Smart Money
-        </NavLink>
+        <div className="sidebar-section-title">Intelligence</div>
+        {navItems.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            onClick={onNavigate}
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <Icon className="nav-link-icon" />
+            {label}
+          </NavLink>
+        ))}
 
         <div className="sidebar-section-title">Account</div>
-
         <NavLink
           to="/settings"
-          className={({ isActive }) =>
-            `nav-link ${isActive ? 'active' : ''}`
-          }
+          onClick={onNavigate}
+          className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
         >
           <Settings className="nav-link-icon" />
           Settings
         </NavLink>
       </nav>
 
-      {/* Footer */}
-      <div style={{
-        borderTop: '1px solid var(--color-border)',
-        paddingTop: 'var(--space-4)',
-        marginTop: 'var(--space-4)',
-      }}>
-        <div style={{
-          fontSize: 'var(--text-xs)',
-          color: 'var(--color-text-muted)',
-          textAlign: 'center',
-        }}>
-          Powered by Solana
-          <br />
-          <span style={{ color: 'var(--color-safe)' }}>●</span> Mainnet Beta
+      <div className="sidebar-footer">
+        <div className="sidebar-network">
+          <WalletCards size={16} />
+          <div>
+            <div className="sidebar-network__label">Solana Mainnet</div>
+            <div className="sidebar-network__status">Live data channel</div>
+          </div>
         </div>
       </div>
     </aside>
@@ -111,3 +74,5 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+
+

@@ -11,25 +11,26 @@ interface SocialPanelProps {
     telegram_members?: number;
     telegram_active?: number;
     mentions_growth_rate?: number;
-    // Legacy mock fields
+    // Legacy API fields
     unique_users?: number;
     activity_level?: string;
     trending_rank?: number | null;
+    data_source?: 'twitter_live' | 'unavailable' | string;
   } | null;
 }
 
 const SocialPanel = ({ data }: SocialPanelProps) => {
   if (!data) return null;
 
-  // Normalize sentiment — API returns number + label, mock returns string
+  // Normalize sentiment - API can return number + label or legacy string shape
   const sentimentLabel = data.sentiment_label ?? 
     (typeof data.sentiment === 'number' 
       ? (data.sentiment > 0.3 ? 'POSITIVE' : data.sentiment < -0.3 ? 'NEGATIVE' : 'NEUTRAL')
       : String(data.sentiment ?? 'neutral'));
 
   const normalizedSentiment = sentimentLabel.toLowerCase();
-  const uniqueUsers = data.unique_authors ?? data.unique_users ?? 0;
-  const tweetCount = data.tweet_count ?? 0;
+  const uniqueUsers = data.unique_authors ?? data.unique_users ?? null;
+  const tweetCount = data.tweet_count ?? null;
   
   // Determine activity level from mentions growth rate
   const growthRate = data.mentions_growth_rate ?? 0;
@@ -37,18 +38,18 @@ const SocialPanel = ({ data }: SocialPanelProps) => {
     (growthRate > 200 ? 'viral' : growthRate > 50 ? 'high' : growthRate > 10 ? 'moderate' : 'low');
 
   const sentimentConfig: Record<string, { color: string; emoji: string; bg: string }> = {
-    positive: { color: '#2ed573', emoji: '😄', bg: 'rgba(46,213,115,0.12)' },
-    neutral: { color: '#eccc68', emoji: '😐', bg: 'rgba(236,204,104,0.12)' },
-    negative: { color: '#ff4757', emoji: '😰', bg: 'rgba(255,71,87,0.12)' },
-    suspicious: { color: '#ffa502', emoji: '🤔', bg: 'rgba(255,165,2,0.12)' },
-    mixed: { color: '#ffa502', emoji: '🤔', bg: 'rgba(255,165,2,0.12)' },
+    positive: { color: '#37c978', emoji: 'POS', bg: 'rgba(55,201,120,0.12)' },
+    neutral: { color: '#f5b849', emoji: 'NEU', bg: 'rgba(245,184,73,0.12)' },
+    negative: { color: '#ff5f6d', emoji: 'NEG', bg: 'rgba(255,95,109,0.12)' },
+    suspicious: { color: '#f5b849', emoji: 'SUSP', bg: 'rgba(245,184,73,0.12)' },
+    mixed: { color: '#f5b849', emoji: 'MIX', bg: 'rgba(245,184,73,0.12)' },
   };
 
   const activityConfig: Record<string, { color: string; label: string }> = {
-    viral: { color: '#ff4757', label: '🔥 VIRAL' },
-    high: { color: '#ffa502', label: '📈 HIGH' },
-    moderate: { color: '#eccc68', label: '➡️ MODERATE' },
-    low: { color: '#70a1ff', label: '📉 LOW' },
+    viral: { color: '#ff5f6d', label: 'VIRAL' },
+    high: { color: '#f5b849', label: 'HIGH' },
+    moderate: { color: '#f5b849', label: 'MODERATE' },
+    low: { color: '#7fb0ff', label: 'LOW' },
   };
 
   const sent = sentimentConfig[normalizedSentiment] ?? sentimentConfig.neutral;
@@ -61,7 +62,7 @@ const SocialPanel = ({ data }: SocialPanelProps) => {
         marginBottom: 'var(--space-4)',
         display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
       }}>
-        📡 Social Intelligence
+         Social Intelligence
       </h3>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
@@ -127,13 +128,21 @@ const SocialPanel = ({ data }: SocialPanelProps) => {
         color: 'var(--color-text-muted)', borderTop: '1px solid var(--color-border)',
         paddingTop: 'var(--space-3)', flexWrap: 'wrap',
       }}>
-        <span>📝 {tweetCount.toLocaleString()} tweets</span>
-        <span>👤 {uniqueUsers.toLocaleString()} unique users</span>
-        {data.telegram_members && <span>💬 {data.telegram_members.toLocaleString()} TG members</span>}
-        {data.trending_rank && <span>🏆 Trending #{data.trending_rank}</span>}
+        <span> {tweetCount != null ? tweetCount.toLocaleString() + ' tweets' : ' Loading...'}</span>
+        <span> {uniqueUsers != null ? uniqueUsers.toLocaleString() + ' unique users' : '-'}</span>
+        {data.telegram_members != null && <span> {data.telegram_members.toLocaleString()} TG members</span>}
+        {data.trending_rank && <span> Trending #{data.trending_rank}</span>}
+        {data.data_source === 'twitter_live' && (
+          <span style={{ marginLeft: 'auto', fontSize: 9, color: '#1da1f2', fontWeight: 700 }}> LIVE</span>
+        )}
+        {data.data_source === 'unavailable' && (
+          <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--color-text-muted)' }}>No social data</span>
+        )}
       </div>
     </div>
   );
 };
 
 export default SocialPanel;
+
+

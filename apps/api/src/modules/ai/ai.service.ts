@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GeminiService, ParsedIntent } from '../../providers/gemini/gemini.service';
+import { LlmService, ParsedIntent, ScanSummary } from '../../providers/ai/llm.service';
 
 /**
  * AI Module — Intent Parser + Explanation
@@ -14,7 +14,7 @@ import { GeminiService, ParsedIntent } from '../../providers/gemini/gemini.servi
 export class AiService {
   private readonly logger = new Logger(AiService.name);
 
-  constructor(private gemini: GeminiService) {}
+  constructor(private llm: LlmService) {}
 
   /**
    * Parse user input into structured action.
@@ -30,17 +30,21 @@ export class AiService {
 
     // Step 2: Fallback to AI for complex queries
     this.logger.debug('Falling back to AI intent parser');
-    return this.gemini.parseIntent(userInput);
+    return this.llm.parseIntent(userInput);
   }
 
   /**
    * Generate AI explanation for scan results.
    */
   async generateExplanation(scanData: any): Promise<string> {
-    return this.gemini.explainDecision(scanData);
+    return this.llm.explainDecision(scanData);
   }
 
-  // ── Rule-based Parser ──
+  async generateScanSummary(scanData: any): Promise<ScanSummary> {
+    return this.llm.generateScanSummary(scanData);
+  }
+
+  // Rule-based parser handles common commands without LLM latency or cost.
 
   private ruleBasedParse(input: string): ParsedIntent | null {
     const lower = input.toLowerCase().trim();
@@ -53,7 +57,7 @@ export class AiService {
     const amountMatch = input.match(/(\d+(?:\.\d+)?)\s*(?:SOL|sol)/i);
 
     // Simple command patterns
-    if (/^(scan|check|audit|kiểm tra|xem)\b/i.test(lower)) {
+    if (/^(scan|check|audit)\b/i.test(lower)) {
       return {
         action: 'SCAN',
         token_address: addressMatch?.[0] ?? null,
@@ -63,7 +67,7 @@ export class AiService {
       };
     }
 
-    if (/^(buy|mua|swap|long)\b/i.test(lower)) {
+    if (/^(buy|swap|long)\b/i.test(lower)) {
       return {
         action: 'BUY',
         token_address: addressMatch?.[0] ?? null,
@@ -73,7 +77,7 @@ export class AiService {
       };
     }
 
-    if (/^(watch|theo dõi|add watchlist)\b/i.test(lower)) {
+    if (/^(watch|add watchlist)\b/i.test(lower)) {
       return {
         action: 'WATCHLIST',
         token_address: addressMatch?.[0] ?? null,
@@ -94,7 +98,7 @@ export class AiService {
       };
     }
 
-    // Can't parse — let AI handle it
+    // Unrecognized inputs fall back to the LLM parser for broader natural-language coverage.
     return null;
   }
 }
