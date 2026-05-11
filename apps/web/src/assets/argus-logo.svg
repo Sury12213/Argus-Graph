@@ -1,0 +1,32 @@
+﻿<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blue" x1="52" y1="38" x2="204" y2="222" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="navy" x1="64" y1="38" x2="212" y2="224" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F2742"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <path d="M128 14C153 34 180 47 218 56V116C218 168 188 211 128 241C68 211 38 168 38 116V56C76 47 103 34 128 14Z" fill="url(#navy)"/>
+  <path d="M128 14C103 34 76 47 38 56V116C38 168 68 211 128 241V14Z" fill="url(#blue)" opacity=".95"/>
+  <path d="M61 77C92 69 111 58 128 43C145 58 164 69 195 77V116C195 156 173 190 128 214C83 190 61 156 61 116V77Z" fill="#F8FAFC" opacity=".96"/>
+  <path d="M61 77C92 69 111 58 128 43V214C83 190 61 156 61 116V77Z" fill="#EAF4FF" opacity=".92"/>
+  <path d="M47 142C70 105 99 86 128 86C157 86 186 105 209 142C186 172 157 187 128 187C99 187 70 172 47 142Z" fill="#08233D"/>
+  <path d="M65 142C84 121 105 110 128 110C151 110 172 121 191 142C172 160 151 169 128 169C105 169 84 160 65 142Z" fill="#F8FAFC"/>
+  <circle cx="128" cy="142" r="38" fill="url(#blue)"/>
+  <circle cx="128" cy="142" r="17" fill="#020617"/>
+  <circle cx="112" cy="126" r="8" fill="#F8FAFC"/>
+  <path d="M128 180V215" stroke="#0A2740" stroke-width="8" stroke-linecap="round"/>
+  <path d="M128 180L84 205" stroke="#284B66" stroke-width="7" stroke-linecap="round"/>
+  <path d="M128 180L172 205" stroke="#284B66" stroke-width="7" stroke-linecap="round"/>
+  <path d="M82 166L48 154" stroke="#284B66" stroke-width="7" stroke-linecap="round"/>
+  <path d="M174 166L208 154" stroke="#284B66" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="128" cy="180" r="18" fill="url(#blue)" stroke="#F8FAFC" stroke-width="8"/>
+  <circle cx="48" cy="154" r="15" fill="#38BDF8" stroke="#F8FAFC" stroke-width="8"/>
+  <circle cx="208" cy="154" r="15" fill="#38BDF8" stroke="#F8FAFC" stroke-width="8"/>
+  <circle cx="84" cy="205" r="13" fill="#64748B" stroke="#F8FAFC" stroke-width="7"/>
+  <circle cx="172" cy="205" r="13" fill="#64748B" stroke="#F8FAFC" stroke-width="7"/>
+  <circle cx="128" cy="224" r="14" fill="#38BDF8" stroke="#F8FAFC" stroke-width="7"/>
+</svg>

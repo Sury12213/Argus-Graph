@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build
+dist/
+build/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+apps/api/prisma/migrations/
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Docker volumes
+pgdata/
+redisdata/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# Temp / AI
+.antigravity/
+.gemini/
+.claude/
+.playwright-mcp/
+argus-pitch/
+decks/argus-pitch/
